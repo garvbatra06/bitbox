@@ -298,6 +298,46 @@
             background-color: #2980b9;
         }
 
+        /* Loading spinner */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3498db;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Status message */
+        .status-message {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
         /* Responsive design */
         @media (max-width: 768px) {
             .hero h1 {
@@ -359,6 +399,11 @@
             </div>
         </div>
     </section>
+
+    <!-- Status Messages -->
+    <div class="container" id="status-container" style="display: none;">
+        <div class="status-message" id="status-message"></div>
+    </div>
 
     <!-- Freelancer Registration Form -->
     <section class="registration-container" id="freelancer-form">
@@ -453,6 +498,10 @@
         <div class="container">
             <h2>Available Freelancers</h2>
             <div class="freelancers-grid" id="freelancers-grid">
+                <!-- Loading spinner -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                </div>
                 <!-- Freelancers will be added here dynamically -->
             </div>
         </div>
@@ -468,16 +517,21 @@
         const clientRegistration = document.getElementById('client-registration');
         const clientDashboard = document.getElementById('client-dashboard');
         const freelancersGrid = document.getElementById('freelancers-grid');
+        const loadingSpinner = document.getElementById('loading');
         const navFreelancers = document.querySelector('.nav-freelancers');
+        const statusContainer = document.getElementById('status-container');
+        const statusMessage = document.getElementById('status-message');
 
-        // Array to store registered freelancers
-        let freelancers = [];
+        // API URL - change this to your JSON Server URL when deployed
+        // When running locally, this will be http://localhost:3000
+        const API_URL = 'http://localhost:3000';
 
         // Event Listeners for Registration Buttons
         freelancerSignupBtn.addEventListener('click', () => {
             freelancerForm.style.display = 'block';
             clientForm.style.display = 'none';
             clientDashboard.style.display = 'none';
+            statusContainer.style.display = 'none';
             window.scrollTo({ top: freelancerForm.offsetTop - 50, behavior: 'smooth' });
         });
 
@@ -485,6 +539,7 @@
             clientForm.style.display = 'block';
             freelancerForm.style.display = 'none';
             clientDashboard.style.display = 'none';
+            statusContainer.style.display = 'none';
             window.scrollTo({ top: clientForm.offsetTop - 50, behavior: 'smooth' });
         });
 
@@ -494,8 +549,20 @@
             showClientDashboard();
         });
 
+        // Function to show status messages
+        function showStatus(message, isSuccess) {
+            statusContainer.style.display = 'block';
+            statusMessage.textContent = message;
+            statusMessage.className = isSuccess ? 'status-message success' : 'status-message error';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusContainer.style.display = 'none';
+            }, 5000);
+        }
+
         // Freelancer Registration Form Submit
-        freelancerRegistration.addEventListener('submit', (e) => {
+        freelancerRegistration.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             // Get form values
@@ -515,26 +582,41 @@
                 skills,
                 experience,
                 hourlyRate,
-                bio
+                bio,
+                dateRegistered: new Date().toISOString()
             };
             
-            // Add freelancer to array
-            freelancers.push(freelancer);
-            
-            // Reset form
-            freelancerRegistration.reset();
-            
-            // Show confirmation and redirect to dashboard
-            alert('Registration successful! Clients can now view your profile.');
-            freelancerForm.style.display = 'none';
-            
-            // Update and show the client dashboard
-            updateFreelancersList();
-            showClientDashboard();
+            try {
+                // Post to JSON Server
+                const response = await fetch(`${API_URL}/freelancers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(freelancer)
+                });
+                
+                if (response.ok) {
+                    // Reset form
+                    freelancerRegistration.reset();
+                    
+                    // Show confirmation and redirect to dashboard
+                    showStatus('Registration successful! Clients can now view your profile.', true);
+                    freelancerForm.style.display = 'none';
+                    
+                    // Update and show the client dashboard
+                    showClientDashboard();
+                } else {
+                    showStatus('Registration failed. Please try again.', false);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('Connection error. Please check if JSON Server is running.', false);
+            }
         });
 
         // Client Registration Form Submit
-        clientRegistration.addEventListener('submit', (e) => {
+        clientRegistration.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             // Get form values
@@ -543,23 +625,82 @@
             const company = document.getElementById('company').value;
             const industry = document.getElementById('industry').value;
             
-            // Show confirmation and redirect to dashboard
-            alert('Registration successful! You can now browse available freelancers.');
-            clientForm.style.display = 'none';
+            // Create client object
+            const client = {
+                name,
+                email,
+                company,
+                industry,
+                dateRegistered: new Date().toISOString()
+            };
             
-            // Update and show the client dashboard
-            updateFreelancersList();
-            showClientDashboard();
+            try {
+                // Post to JSON Server
+                const response = await fetch(`${API_URL}/clients`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(client)
+                });
+                
+                if (response.ok) {
+                    // Reset form
+                    clientRegistration.reset();
+                    
+                    // Show confirmation and redirect to dashboard
+                    showStatus('Registration successful! You can now browse available freelancers.', true);
+                    clientForm.style.display = 'none';
+                    
+                    // Update and show the client dashboard
+                    showClientDashboard();
+                } else {
+                    showStatus('Registration failed. Please try again.', false);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('Connection error. Please check if JSON Server is running.', false);
+            }
         });
 
+        // Function to fetch freelancers from the API
+        async function fetchFreelancers() {
+            try {
+                loadingSpinner.style.display = 'block';
+                
+                const response = await fetch(`${API_URL}/freelancers`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch freelancers');
+                }
+                
+                const freelancers = await response.json();
+                return freelancers;
+            } catch (error) {
+                console.error('Error fetching freelancers:', error);
+                showStatus('Failed to load freelancers. Please check if JSON Server is running.', false);
+                return [];
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
         // Function to update the freelancers list in the client dashboard
-        function updateFreelancersList() {
-            // Clear current list
-            freelancersGrid.innerHTML = '';
+        async function updateFreelancersList() {
+            // Clear current list (except the loading spinner)
+            while (freelancersGrid.firstChild && freelancersGrid.firstChild !== loadingSpinner) {
+                freelancersGrid.removeChild(freelancersGrid.lastChild);
+            }
+            
+            // Fetch freelancers from API
+            const freelancers = await fetchFreelancers();
             
             if (freelancers.length === 0) {
                 // Display message if no freelancers
-                freelancersGrid.innerHTML = '<p style="text-align: center; grid-column: 1 / -1;">No freelancers registered yet.</p>';
+                const noFreelancersMsg = document.createElement('p');
+                noFreelancersMsg.style.textAlign = 'center';
+                noFreelancersMsg.style.gridColumn = '1 / -1';
+                noFreelancersMsg.textContent = 'No freelancers registered yet.';
+                freelancersGrid.appendChild(noFreelancersMsg);
             } else {
                 // Add each freelancer to the grid
                 freelancers.forEach(freelancer => {
@@ -583,7 +724,7 @@
                             </div>
                             <p class="freelancer-rate">$${freelancer.hourlyRate}/hour</p>
                             <p>${freelancer.bio.substring(0, 100)}${freelancer.bio.length > 100 ? '...' : ''}</p>
-                            <button class="contact-button">Contact</button>
+                            <button class="contact-button" data-email="${freelancer.email}">Contact</button>
                         </div>
                     `;
                     
@@ -601,53 +742,27 @@
             updateFreelancersList();
         }
 
-        // Add some sample freelancers for demonstration
-        function addSampleFreelancers() {
-            const sampleFreelancers = [
-                {
-                    name: 'Sarah Johnson',
-                    email: 'sarah@example.com',
-                    title: 'Full Stack Web Developer',
-                    skills: ['JavaScript', 'React', 'Node.js', 'MongoDB'],
-                    experience: '3-5',
-                    hourlyRate: '65',
-                    bio: 'I specialize in building modern web applications with React and Node.js. With over 4 years of experience, I can help you bring your web project to life.'
-                },
-                {
-                    name: 'Michael Chen',
-                    email: 'michael@example.com',
-                    title: 'UI/UX Designer',
-                    skills: ['UI Design', 'Figma', 'Adobe XD', 'Prototyping'],
-                    experience: '5-10',
-                    hourlyRate: '75',
-                    bio: 'Creative UI/UX designer with a passion for creating beautiful and functional interfaces. I focus on user-centered design to enhance user experience.'
-                },
-                {
-                    name: 'Jessica Patel',
-                    email: 'jessica@example.com',
-                    title: 'Content Writer & SEO Specialist',
-                    skills: ['Content Writing', 'SEO', 'Copywriting', 'Blog Management'],
-                    experience: '3-5',
-                    hourlyRate: '45',
-                    bio: 'I create engaging content that resonates with your audience while optimizing for search engines. Let me help you boost your online presence.'
-                }
-            ];
-            
-            // Add sample freelancers to the array
-            freelancers = [...freelancers, ...sampleFreelancers];
-        }
-
-        // Add sample freelancers when the page loads
-        window.addEventListener('load', addSampleFreelancers);
-
         // Contact buttons event listeners
         document.addEventListener('click', function(e) {
             if (e.target && e.target.className === 'contact-button') {
-                alert('Contact feature will be implemented in the next version.');
+                const email = e.target.getAttribute('data-email');
+                alert(`Contact feature will be implemented in the next version. You would contact: ${email}`);
+            }
+        });
+
+        // Load freelancers when the page loads
+        window.addEventListener('load', async () => {
+            // Check if JSON Server is running
+            try {
+                const response = await fetch(`${API_URL}`);
+                if (!response.ok) {
+                    throw new Error('JSON Server not responding');
+                }
+            } catch (error) {
+                console.error('JSON Server connection error:', error);
+                showStatus('Warning: Cannot connect to JSON Server. The website will have limited functionality.', false);
             }
         });
     </script>
 </body>
 </html>
-Improve
-Explain
